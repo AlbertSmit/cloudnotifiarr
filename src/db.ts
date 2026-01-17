@@ -1,5 +1,16 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PushSubscription } from './types';
+import {
+  SAVE_SUBSCRIPTION,
+  DEACTIVATE_SUBSCRIPTION,
+  GET_ACTIVE_SUBSCRIPTIONS,
+  GET_SUBSCRIPTION_BY_ENDPOINT,
+  CLEANUP_EXPIRED_SUBSCRIPTIONS,
+  GET_SUBSCRIPTION_COUNT,
+  SAVE_NOTIFICATION,
+  GET_RECENT_NOTIFICATIONS,
+  MARK_NOTIFICATION_SENT,
+} from './queries';
 
 export interface SubscriptionRecord {
   endpoint: string;
@@ -21,19 +32,7 @@ export async function saveSubscription(
   userAgent?: string
 ): Promise<void> {
   await db
-    .prepare(
-      `
-      INSERT INTO subscriptions (endpoint, p256dh, auth, expiration_time, user_agent, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(endpoint) DO UPDATE SET
-        p256dh = excluded.p256dh,
-        auth = excluded.auth,
-        expiration_time = excluded.expiration_time,
-        user_agent = excluded.user_agent,
-        updated_at = excluded.updated_at,
-        active = 1
-    `
-    )
+    .prepare(SAVE_SUBSCRIPTION)
     .bind(
       subscription.endpoint,
       subscription.keys.p256dh,
@@ -54,13 +53,7 @@ export async function deactivateSubscription(
   endpoint: string
 ): Promise<void> {
   await db
-    .prepare(
-      `
-      UPDATE subscriptions
-      SET active = 0, updated_at = ?
-      WHERE endpoint = ?
-    `
-    )
+    .prepare(DEACTIVATE_SUBSCRIPTION)
     .bind(Date.now(), endpoint)
     .run();
 }
@@ -72,16 +65,10 @@ export async function getActiveSubscriptions(
   db: D1Database
 ): Promise<SubscriptionRecord[]> {
   const result = await db
-    .prepare(
-      `
-      SELECT endpoint, p256dh, auth, expiration_time, user_agent, created_at, updated_at, active
-      FROM subscriptions
-      WHERE active = 1
-      `
-    )
+    .prepare(GET_ACTIVE_SUBSCRIPTIONS)
     .all();
 
-  return (result.results as SubscriptionRecord[]) || [];
+  return (result.results as unknown as SubscriptionRecord[]) || [];
 }
 
 /**
@@ -92,17 +79,11 @@ export async function getSubscriptionByEndpoint(
   endpoint: string
 ): Promise<SubscriptionRecord | null> {
   const result = await db
-    .prepare(
-      `
-      SELECT endpoint, p256dh, auth, expiration_time, user_agent, created_at, updated_at, active
-      FROM subscriptions
-      WHERE endpoint = ? AND active = 1
-    `
-    )
+    .prepare(GET_SUBSCRIPTION_BY_ENDPOINT)
     .bind(endpoint)
     .first();
 
-  return result as SubscriptionRecord | null;
+  return result as unknown as SubscriptionRecord | null;
 }
 
 /**
@@ -114,13 +95,7 @@ export async function cleanupExpiredSubscriptions(
   const now = Date.now();
   
   const result = await db
-    .prepare(
-      `
-      UPDATE subscriptions
-      SET active = 0, updated_at = ?
-      WHERE active = 1 AND expiration_time IS NOT NULL AND expiration_time < ?
-    `
-    )
+    .prepare(CLEANUP_EXPIRED_SUBSCRIPTIONS)
     .bind(now, now)
     .run();
 
@@ -134,16 +109,10 @@ export async function getSubscriptionCount(
   db: D1Database
 ): Promise<number> {
   const result = await db
-    .prepare(
-      `
-      SELECT COUNT(*) as count
-      FROM subscriptions
-      WHERE active = 1
-    `
-    )
+    .prepare(GET_SUBSCRIPTION_COUNT)
     .first();
 
-  return (result as { count: number }).count;
+  return (result as unknown as { count: number }).count;
 }
 
 /**
@@ -171,12 +140,7 @@ export async function saveNotification(
   eventType: string
 ): Promise<number> {
   const result = await db
-    .prepare(
-      `
-      INSERT INTO notifications (title, body, data, event_type, created_at)
-      VALUES (?, ?, ?, ?, ?)
-    `
-    )
+    .prepare(SAVE_NOTIFICATION)
     .bind(title, body, data, eventType, Date.now())
     .run();
 
@@ -191,18 +155,11 @@ export async function getRecentNotifications(
   limit: number = 20
 ): Promise<Array<{ id: number; title: string; body: string; event_type: string; created_at: number }>> {
   const result = await db
-    .prepare(
-      `
-      SELECT id, title, body, event_type, created_at
-      FROM notifications
-      ORDER BY created_at DESC
-      LIMIT ?
-    `
-    )
+    .prepare(GET_RECENT_NOTIFICATIONS)
     .bind(limit)
     .all();
 
-  return (result.results as Array<{ id: number; title: string; body: string; event_type: string; created_at: number }>) || [];
+  return (result.results as unknown as Array<{ id: number; title: string; body: string; event_type: string; created_at: number }>) || [];
 }
 
 /**
@@ -213,13 +170,7 @@ export async function markNotificationSent(
   id: number
 ): Promise<void> {
   await db
-    .prepare(
-      `
-      UPDATE notifications
-      SET sent = 1
-      WHERE id = ?
-    `
-    )
+    .prepare(MARK_NOTIFICATION_SENT)
     .bind(id)
     .run();
 }

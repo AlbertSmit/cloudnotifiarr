@@ -4,7 +4,12 @@ import {
   getAudience,
   importVapidPrivateKey,
 } from './encryption';
-import { recordToSubscription, getActiveSubscriptions } from './db';
+import {
+  recordToSubscription,
+  getActiveSubscriptions,
+  deactivateSubscription,
+  getSubscriptionByEndpoint
+} from './db';
 import type { Env, NotificationPayload, PushSubscription } from './types';
 import type { D1Database } from '@cloudflare/workers-types';
 
@@ -141,40 +146,4 @@ export async function sendNotificationToSubscription(
     console.error('Failed to send notification:', error);
     return { success: false, status: 500, statusText: error.message || String(error) };
   }
-}
-
-// Import the deactivateSubscription from db for use in this file
-async function deactivateSubscription(
-  db: D1Database,
-  endpoint: string
-): Promise<void> {
-  await db
-    .prepare(
-      `
-      UPDATE subscriptions
-      SET active = 0, updated_at = ?
-      WHERE endpoint = ?
-    `
-    )
-    .bind(Date.now(), endpoint)
-    .run();
-}
-
-// Import getSubscriptionByEndpoint for use in sendNotificationToSubscription
-async function getSubscriptionByEndpoint(
-  db: D1Database,
-  endpoint: string
-) {
-  const result = await db
-    .prepare(
-      `
-      SELECT endpoint, p256dh, auth, expiration_time, user_agent, created_at, updated_at, active
-      FROM subscriptions
-      WHERE endpoint = ? AND active = 1
-    `
-    )
-    .bind(endpoint)
-    .first();
-
-  return result;
 }
