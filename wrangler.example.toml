@@ -1,0 +1,30 @@
+name = "cloudnotifiarr"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+[vars]
+ENVIRONMENT = "production"
+
+# D1 Database - replace database_id after running `npx wrangler d1 create cloudnotifiarr`
+[[d1_databases]]
+binding = "DB"
+database_name = "cloudnotifiarr"
+database_id = "YOUR_D1_DATABASE_ID"
+
+# Routes
+[[routes]]
+pattern = "notifications.yourdomain.com/*"
+zone_name = "yourdomain.com"
+
+[build]
+command = "esbuild --bundle --minify --outdir=dist src/index.ts"
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true

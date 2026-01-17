@@ -1,0 +1,20 @@
+{
+  "name": "cloudnotifiarr",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers Web Push notification server for *arr suite",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "generate-keys": "node scripts/generate-keys.js",
+    "db:push": "wrangler d1 execute cloudnotifiarr --file=schema.sql --remote",
+    "db:studio": "wrangler d1 studio cloudnotifiarr"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^3.0.0",
+    "esbuild": "^0.19.0",
+    "typescript": "^5.0.0",
+    "@cloudflare/workers-types": "^4.0.0"
+  }
+}
