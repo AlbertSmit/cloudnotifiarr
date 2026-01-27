@@ -306,6 +306,23 @@ function formatArrMessage(webhook: ArrWebhookPayload): FormattedMessage {
 			data.type = "arr-movie";
 			break;
 
+		case "MovieAdded":
+			title = "Movie Added";
+			body = webhook.movie?.title || "Unknown Movie";
+			if (webhook.movie?.year) body += ` (${webhook.movie.year})`;
+			data.type = "arr-movie-add";
+			break;
+
+		case "MovieGrab":
+			title = "Movie Grabbed";
+			body = webhook.movie?.title || "Unknown Movie";
+			if (webhook.movie?.year) body += ` (${webhook.movie.year})`;
+			if (webhook.release?.quality) body += ` [${webhook.release.quality}]`;
+			if (webhook.release?.releaseGroup)
+				body += ` - ${webhook.release.releaseGroup}`;
+			data.type = "arr-movie-grab";
+			break;
+
 		case "ApplicationUpdate":
 			title = "App Updated";
 			body = (webhook.package?.packageAuthor || "App") + " updated";
@@ -313,8 +330,8 @@ function formatArrMessage(webhook: ArrWebhookPayload): FormattedMessage {
 			break;
 
 		default:
-			title = eventType;
-			body = JSON.stringify(webhook);
+			title = formatEventTypeTitle(eventType);
+			body = extractBestBody(webhook);
 			data.type = "arr-other";
 	}
 
@@ -366,4 +383,47 @@ function formatHealthMessage(webhook: ArrWebhookPayload): string {
 			.join("\n");
 	}
 	return "Health check failed";
+}
+
+/**
+ * Converts camelCase/PascalCase eventType to a human-readable title
+ * e.g. "MovieAdded" -> "Movie Added", "EpisodeFileDelete" -> "Episode File Delete"
+ */
+function formatEventTypeTitle(eventType: string): string {
+	return eventType
+		.replace(/([a-z])([A-Z])/g, "$1 $2")
+		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
+}
+
+/**
+ * Extracts the best human-readable summary from an *arr webhook payload
+ * Tries to find meaningful content rather than dumping raw JSON
+ */
+function extractBestBody(webhook: ArrWebhookPayload): string {
+	// Try movie info first
+	if (webhook.movie?.title) {
+		let msg = webhook.movie.title;
+		if (webhook.movie.year) msg += ` (${webhook.movie.year})`;
+		return msg;
+	}
+
+	// Try series/episode info
+	if (webhook.series?.title) {
+		return formatEpisodeMessage(webhook);
+	}
+
+	// Try health messages
+	if (webhook.messages && webhook.messages.length > 0) {
+		return formatHealthMessage(webhook);
+	}
+
+	// Try package info (for updates)
+	if (webhook.package?.packageAuthor) {
+		let msg = webhook.package.packageAuthor;
+		if (webhook.package.packageVersion) msg += ` v${webhook.package.packageVersion}`;
+		return msg;
+	}
+
+	// Last resort: indicate unknown payload
+	return "Notification received";
 }
